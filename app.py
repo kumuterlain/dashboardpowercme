@@ -26,14 +26,14 @@ header[data-testid="stHeader"],footer,#MainMenu,[data-testid="stToolbar"]{{displ
 .block-container{{padding:12px 16px 0 16px;max-width:100%;font-size:var(--f)}}
 .ttl{{display:inline-block;margin:0;font-size:calc(var(--f)*1.8);font-weight:700;line-height:1.2;background:{HIGHLIGHT};color:#1f2937;padding:.15em .7em;border-radius:.3em}}
 .top{{display:flex;justify-content:flex-end;gap:.5em;flex-wrap:wrap}}
-.bd{{color:#fff;font-weight:600;font-size:var(--f);padding:.45em .9em;border-radius:.3em}}
+.bd{{color:#000;font-weight:600;font-size:var(--f);padding:.45em .9em;border-radius:.3em}}
 .gr{{display:grid;grid-template-columns:repeat(auto-fit,minmax(calc(50*var(--f)),1fr));gap:20px;align-items:start;overflow-x:auto}}
 table.ms{{border-collapse:collapse;width:100%;font-size:var(--f);margin:0}}
 table.ms th{{font-size:.92em;text-align:center;padding:.2em .1em;white-space:nowrap;border:0;background:transparent}}
 table.ms td{{padding:.2em .1em;text-align:center;white-space:nowrap;border:0;border-bottom:1px solid #e5e7eb;vertical-align:middle}}
 table.ms th:nth-child(-n+2),table.ms td:nth-child(-n+2){{text-align:left}}
 table.ms td:nth-child(1){{color:#6b7280;padding-right:.4em}}
-.p{{display:inline-block;min-width:3em;padding:.08em .45em;border-radius:1em;color:#fff;font-weight:600;font-size:.92em;background:{OK}}}
+.p{{display:inline-block;min-width:3em;padding:.08em .45em;border-radius:1em;color:#000;font-weight:600;font-size:.92em;background:{OK}}}
 .p.r{{background:{BAD}}}.p.n{{background:{NA_BG};color:#6b7280}}
 .lg{{display:flex;gap:1.2em;color:#6b7280;font-size:.92em;align-items:center;flex-wrap:wrap;margin-top:.5em}}
 .lg i{{display:inline-block;width:.8em;height:.8em;margin-right:.3em}}
