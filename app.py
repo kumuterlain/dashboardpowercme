@@ -30,7 +30,7 @@ header[data-testid="stHeader"],footer,#MainMenu,[data-testid="stToolbar"]{{displ
 .gr{{display:grid;grid-template-columns:repeat(auto-fit,minmax(calc(50*var(--f)),1fr));gap:20px;align-items:start;overflow-x:auto}}
 table.ms{{border-collapse:collapse;width:100%;font-size:var(--f);margin:0}}
 table.ms th{{font-size:.92em;text-align:center;padding:.2em .1em;white-space:nowrap;border:0;background:transparent}}
-table.ms td{{padding:.2em .1em;text-align:center;white-space:nowrap;border:0;border-bottom:1px solid #e5e7eb;vertical-align:middle}}
+table.ms td{{padding:.2em .1em;text-align:center;white-space:nowrap;border:0;border-bottom:1px solid #e5e7eb;vertical-align:middle;color:#000}}
 table.ms th:nth-child(-n+2),table.ms td:nth-child(-n+2){{text-align:left}}
 table.ms td:nth-child(1){{color:#6b7280;padding-right:.4em}}
 .p{{display:inline-block;min-width:3em;padding:.08em .45em;border-radius:1em;color:#fff;font-weight:600;font-size:.92em;background:{OK}}}
