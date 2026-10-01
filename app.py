@@ -81,7 +81,7 @@ def dashboard():
     st.markdown(
         f"<div class='lg'><span><i style='background:{OK}'></i>Normal</span>"
         f"<span><i style='background:{BAD}'></i>Bermasalah</span>"
-        f"<span><i style='background:{NA_BG}'></i>Unmonitor / N/A / NY</span>"
+        f"<span><i style='background:{NA_BG}'></i>N/A / NY</span>"
         f"<span style='margin-left:auto'>{stamp}</span></div>",
         unsafe_allow_html=True)
 
