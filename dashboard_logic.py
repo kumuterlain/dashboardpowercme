@@ -7,6 +7,9 @@ COLS = ["Battery", "MPPT", "HFSM", "Rectifier", "Genset(h)", "Longsor",
         "Ground(Ω)", "Vertical", "Hammer", "Tower", "CCTV", "AC"]
  
  
+SUB = ["(INSTALLED/<wbr>UN MON/<wbr>FAULTY)", "(INSTALLED/<wbr>UN MON/<wbr>FAULTY)", "(INSTALLED/<wbr>UN MON/<wbr>FAULTY)", "(INSTALLED/<wbr>UN MON/<wbr>FAULTY)", "MAX 20 HOURS", "TIDAK RAWAN &gt; 5 M<br>RAWAN &lt; 5 M<br>SANGAT RAWAN &lt; 3 M", "(&lt;1 OHM)", "(LIMIT/<wbr>RESULT)", "(&lt;K-200)", "", "(INSTALLED/<wbr>UN MON)", ""]
+ 
+ 
 def nums(s):
     v = re.findall(r"\d+(?:\.\d+)?", s or "")
     return [float(x) for x in v] if v else None
@@ -118,6 +121,7 @@ def render(sites, flt="all", per_block=None):
         if not part:
             break
         head = "<th>No</th><th>Site</th>" + "".join(f"<th>{x}</th>" for x in COLS)
+        sub = "<tr class=\"sub\"><th></th><th></th>" + "".join(f"<th><div class=\"sb\">{x}</div></th>" for x in SUB) + "</tr>"
         body = "".join(
             f"<tr><td>{html.escape(s['no'])}</td>"
             f"<td title=\"{html.escape(s['reg'])}\">{html.escape(s['site'])}</td>"
@@ -126,6 +130,6 @@ def render(sites, flt="all", per_block=None):
                 f"title=\"{COLS[i]}\">{html.escape(str(t))}</span></td>"
                 for i, (t, st) in enumerate(s["cells"]))
             + "</tr>" for s in part)
-        blocks.append(f"<table class=\"ms\"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>")
+        blocks.append(f"<table class=\"ms\"><thead><tr>{head}</tr>{sub}</thead><tbody>{body}</tbody></table>")
     return "<div class=\"gr\">" + "".join(blocks) + "</div>"
  
