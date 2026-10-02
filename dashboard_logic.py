@@ -64,7 +64,7 @@ def cells(d):
     if v and len(v) >= 2:
         q = v[1] / v[0] if v[0] > 0 else (float("inf") if v[1] > 0 else 0)
         # hasil/limit: <50% hijau, 50-<75% kuning, 75-<100% oranye, >=100% merah
-        out.append((f"{v[1]:g}/{v[0]:g}", 1 if q >= 1 else 4 if q >= 0.75 else 3 if q >= 0.5 else 0))
+        out.append((f"{v[0]:g}/{v[1]:g}", 1 if q >= 1 else 4 if q >= 0.75 else 3 if q >= 0.5 else 0))
     else:
         out.append(NA)
     hm = num(d["hammer"])
