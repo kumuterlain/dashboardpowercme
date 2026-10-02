@@ -80,8 +80,8 @@ def dashboard():
     stamp = f"Diperbarui otomatis tiap {REFRESH_SECONDS} detik · terakhir {t:%H:%M:%S}" if t else ""
     st.markdown(
         f"<div class='lg'><span><i style='background:{OK}'></i>Normal</span>"
-        f"<span><i style='background:#eab308'></i>Battery kuning ≤25%</span>"
-        f"<span><i style='background:#f97316'></i>Battery oranye ≤50%</span>"
+        f"<span><i style='background:#eab308'></i>Kuning ≤25%</span>"
+        f"<span><i style='background:#f97316'></i>Oranye ≤50%</span>"
         f"<span><i style='background:{BAD}'></i>Bermasalah</span>"
         f"<span><i style='background:{NA_BG}'></i>Unmonitor / N/A / NY</span>"
         f"<span style='margin-left:auto'>{stamp}</span></div>",
@@ -91,3 +91,4 @@ def dashboard():
 # Filter ada di sidebar (panah kecil kiri atas); sidebar tidak boleh dipanggil dari dalam fragment
 st.sidebar.radio("Filter site", list(LABELS), key="flt")
 dashboard()
+ 
