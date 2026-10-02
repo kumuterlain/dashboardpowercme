@@ -51,7 +51,7 @@ def load_values():
     return ws.get_all_values()
  
  
-LABELS = {"Semua": "all", "Normal": "ok", "Warning/Critical": "bad", "Offline": "off"}
+LABELS = {"Semua": "all", "Normal": "ok", "Warning/Critical": "bad"}
  
  
 @st.fragment(run_every=REFRESH_SECONDS)
@@ -74,7 +74,7 @@ def dashboard():
         f"<div class='top'><span class='bd' style='background:#1e3a8a'>Total Monitored: {len(sites)} Site</span>"
         f"<span class='bd' style='background:{OK}'>Normal Sites: {cnt('ok')} Site</span>"
         f"<span class='bd' style='background:{BAD}'>Warning/Critical: {cnt('bad')} Site</span>"
-        f"<span class='bd' style='background:#9ca3af'>Offline: {cnt('off')} Site</span></div>",
+        "</div>",
         unsafe_allow_html=True)
     pick = st.session_state.get("flt", "Semua")
     st.markdown(render(sites, LABELS[pick]), unsafe_allow_html=True)
