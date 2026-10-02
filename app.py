@@ -1,94 +1,132 @@
-from datetime import datetime
-from zoneinfo import ZoneInfo
+"""Logika parsing sheet + render HTML (tanpa dependensi Streamlit, mudah diuji)."""
+import html
+import re
  
-import gspread
-import streamlit as st
-from google.oauth2.service_account import Credentials
- 
-from dashboard_logic import parse, render
- 
-# ====== PENGATURAN ======
-SHEET_ID = "1qMNpvZnB_0TP8tpt8UYkTpRyKQSsjpF529x8FNQbqkw"
-REFRESH_SECONDS = 60          # interval auto-update
-TIMEZONE = "Asia/Jakarta"
-# Warna (ubah sesuai selera)
-BG, OK, BAD, NA_BG = "#ffffff", "#16a34a", "#ef4444", "#d1d5db"
-TITLE = "Monitoring Issue Power & CME"
-HIGHLIGHT = "#fde047"  # warna highlight judul
-# ========================
- 
-st.set_page_config(page_title=TITLE, layout="wide", initial_sidebar_state="collapsed")
- 
-st.markdown(f"""<style>
-:root{{--f:clamp(11px,.62vw,18px)}}
-.stApp{{background:{BG}}}
-header[data-testid="stHeader"],footer,#MainMenu,[data-testid="stToolbar"]{{display:none}}
-.block-container{{padding:12px 16px 0 16px;max-width:100%;font-size:var(--f)}}
-.ttl{{display:inline-block;margin:0;font-size:calc(var(--f)*1.8);font-weight:700;line-height:1.2;background:{HIGHLIGHT};color:#1f2937;padding:.15em .7em;border-radius:.3em}}
-.top{{display:flex;justify-content:flex-end;gap:.5em;flex-wrap:wrap}}
-.bd{{color:#fff;font-weight:600;font-size:var(--f);padding:.45em .9em;border-radius:.3em}}
-.gr{{display:grid;grid-template-columns:repeat(auto-fit,minmax(calc(50*var(--f)),1fr));gap:20px;align-items:start;overflow-x:auto}}
-table.ms{{border-collapse:collapse;width:100%;font-size:var(--f);margin:0}}
-table.ms th{{color:#1f2937;font-size:.92em;text-align:center;padding:.2em .1em;white-space:nowrap;border:0;background:transparent}}
-table.ms td{{color:#1f2937;padding:.2em .1em;text-align:center;white-space:nowrap;border:0;border-bottom:1px solid #e5e7eb;vertical-align:middle}}
-table.ms th:nth-child(-n+2),table.ms td:nth-child(-n+2){{text-align:left}}
-table.ms td:nth-child(1){{color:#6b7280;padding-right:.4em}}
-.p{{display:inline-block;min-width:3em;padding:.08em .45em;border-radius:1em;color:#fff;font-weight:600;font-size:.92em;background:{OK}}}
-.p.y{{background:#eab308;color:#1f2937}}.p.o{{background:#f97316}}.p.r{{background:{BAD}}}.p.n{{background:{NA_BG};color:#6b7280}}
-.lg{{display:flex;gap:1.2em;color:#6b7280;font-size:.92em;align-items:center;flex-wrap:wrap;margin-top:.5em}}
-.lg i{{display:inline-block;width:.8em;height:.8em;margin-right:.3em}}
-</style>""", unsafe_allow_html=True)
+NA = ("-", 2)  # (teks, status) status: 0 normal, 1 merah, 2 N/A, 3 kuning, 4 oranye
+COLS = ["Battery", "MPPT", "HFSM", "Rectifier", "Genset(h)", "Longsor",
+        "Ground(Ω)", "Vertical", "Hammer", "Tower", "CCTV", "AC"]
  
  
-@st.cache_data(ttl=30, show_spinner=False)
-def load_values():
-    creds = Credentials.from_service_account_info(
-        dict(st.secrets["gcp_service_account"]),
-        scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
-    ws = gspread.authorize(creds).open_by_key(SHEET_ID).get_worksheet(0)  # sheet paling kiri
-    return ws.get_all_values()
+def nums(s):
+    v = re.findall(r"\d+(?:\.\d+)?", s or "")
+    return [float(x) for x in v] if v else None
  
  
-LABELS = {"Semua": "all", "Normal": "ok", "Warning/Critical": "bad", "Offline": "off"}
- 
- 
-@st.fragment(run_every=REFRESH_SECONDS)
-def dashboard():
-    err = None
+def num(s):
     try:
-        sites = parse(load_values())
-        st.session_state["last_sites"] = sites
-        st.session_state["last_time"] = datetime.now(ZoneInfo(TIMEZONE))
-    except Exception as e:  # tampilkan data terakhir jika ada
-        sites, err = st.session_state.get("last_sites"), e
-    if err:
-        st.error(f"Gagal membaca Google Sheet: {err}")
-    if not sites:
-        return
-    cnt = lambda k: sum(1 for s in sites if s["status"] == k)
-    left, right = st.columns([1, 1.6])
-    left.markdown(f"<div class='ttl'>{TITLE.replace('&', '&amp;')}</div>", unsafe_allow_html=True)
-    right.markdown(
-        f"<div class='top'><span class='bd' style='background:#1e3a8a'>Total Monitored: {len(sites)} Site</span>"
-        f"<span class='bd' style='background:{OK}'>Normal Sites: {cnt('ok')} Site</span>"
-        f"<span class='bd' style='background:{BAD}'>Warning/Critical: {cnt('bad')} Site</span>"
-        f"<span class='bd' style='background:#9ca3af'>Offline: {cnt('off')} Site</span></div>",
-        unsafe_allow_html=True)
-    pick = st.session_state.get("flt", "Semua")
-    st.markdown(render(sites, LABELS[pick]), unsafe_allow_html=True)
-    t = st.session_state.get("last_time")
-    stamp = f"Diperbarui otomatis tiap {REFRESH_SECONDS} detik · terakhir {t:%H:%M:%S}" if t else ""
-    st.markdown(
-        f"<div class='lg'><span><i style='background:{OK}'></i>Normal</span>"
-        f"<span><i style='background:#eab308'></i>Kuning ≤25%</span>"
-        f"<span><i style='background:#f97316'></i>Oranye ≤50%</span>"
-        f"<span><i style='background:{BAD}'></i>Bermasalah</span>"
-        f"<span><i style='background:{NA_BG}'></i>Unmonitor / N/A / NY</span>"
-        f"<span style='margin-left:auto'>{stamp}</span></div>",
-        unsafe_allow_html=True)
+        return float(str(s).strip().replace(",", "."))
+    except ValueError:
+        return None
  
  
-# Filter ada di sidebar (panah kecil kiri atas); sidebar tidak boleh dipanggil dari dalam fragment
-st.sidebar.radio("Filter site", list(LABELS), key="flt")
-dashboard()
+def triple(raw):
+    """Format terpasang/un-mon/(faulty): merah jika un-mon atau faulty > 0."""
+    n = nums(raw)
+    if not n:
+        return NA
+    return (re.sub(r"\s+", "", raw), 1 if any(x > 0 for x in n[1:]) else 0)
+ 
+ 
+def battery(raw):
+    """Warna Battery/MPPT/HFSM/Rectifier berdasar rasio (un-mon/faulty terbesar) / terpasang.
+    0 = hijau; <=0.25 kuning(3); <=0.5 oranye(4); >0.5 merah(1)."""
+    n = nums(raw)
+    if not n or len(n) < 2:
+        return NA
+    inst, u = n[0], max(n[1:3])  # un-mon atau faulty (mana lebih besar)
+    txt = re.sub(r"\s+", "", raw)
+    if u == 0:
+        return (txt, 0)
+    q = u / inst if inst > 0 else float("inf")
+    if q <= 0.25:
+        return (txt, 3)
+    if 0.1 < q <= 0.5:
+        return (txt, 4)
+    return (txt, 1)
+ 
+ 
+def cells(d):
+    out = [battery(d["bat"]), battery(d["mppt"]), battery(d["hfsm"]), battery(d["rect"])]
+    gh = num(d["genset"])
+    out.append(NA if gh is None else (f"{gh:g}", 1 if gh > 20 else 0))
+    ls = d["longsor"].upper()
+    if "SANGAT" in ls:
+        out.append(("Sangat", 1))
+    elif "TIDAK" in ls:
+        out.append(("Aman", 0))
+    elif "RAWAN" in ls:
+        out.append(("Rawan", 1))
+    else:
+        out.append(NA)
+    gd = num(d["ground"])
+    out.append(NA if gd is None else (f"{gd:g}", 1 if gd >= 1 else 0))
+    v = nums(d["vert"])
+    if v and len(v) >= 2:
+        q = v[1] / v[0] if v[0] > 0 else (float("inf") if v[1] > 0 else 0)
+        # hasil/limit: <50% hijau, 50-<75% kuning, 75-<100% oranye, >=100% merah
+        out.append((f"{v[1]:g}/{v[0]:g}", 1 if q >= 1 else 4 if q >= 0.75 else 3 if q >= 0.5 else 0))
+    else:
+        out.append(NA)
+    hm = num(d["hammer"])
+    out.append(NA if hm is None else (f"{hm:g}", 0 if hm >= 200 else 3 if hm >= 150 else 4 if hm >= 100 else 1))  # K-200
+    tw = d["tower"].upper()
+    out.append(("OK", 0) if tw == "OK" else ("Minor", 1) if tw == "MINOR" else NA)
+    out.append(triple(d["cctv"]))
+    out.append(("OK", 0) if d["ac"].upper() == "OK" else NA)
+    return out
+ 
+ 
+def parse(values):
+    """values = list of baris (list of string) dari sheet pertama."""
+    hdr = next((i for i, r in enumerate(values)
+                if any(c.strip().upper() == "SITE NAME" for c in r)), None)
+    if hdr is None:
+        raise ValueError("Header 'SITE NAME' tidak ditemukan di sheet pertama.")
+    h = [c.strip().upper() for c in values[hdr]]
+ 
+    def ix(key, exact=False):
+        for i, c in enumerate(h):
+            if (c == key) if exact else (key in c):
+                return i
+        return -1
+ 
+    col = {"no": ix("NO", True), "site": ix("SITE NAME"), "reg": ix("REGIONAL"),
+           "bat": ix("BATTERY"), "mppt": ix("MPPT"), "hfsm": ix("HFSM"),
+           "rect": ix("RECTIFIER"), "genset": ix("GENSET"), "longsor": ix("LONGSOR"),
+           "ground": ix("GROUNDING"), "vert": ix("VERTICALITY"), "hammer": ix("HAMMER"),
+           "tower": ix("KELENGKAPAN"), "cctv": ix("CCTV"),
+           "ac": next((i for i, c in enumerate(h) if c.endswith("STATUS AC")), -1)}
+    sites = []
+    for r in values[hdr + 1:]:
+        d = {k: (r[i].strip() if 0 <= i < len(r) else "") for k, i in col.items()}
+        if not d["site"] or not d["no"].isdigit():
+            continue
+        c = cells(d)
+        live = [x for x in c if x[1] != 2]
+        d["cells"] = c
+        d["status"] = "off" if not live else "bad" if any(x[1] in (1, 3, 4) for x in live) else "ok"
+        sites.append(d)
+    return sites
+ 
+ 
+def render(sites, flt="all", per_block=None):
+    """Kembalikan HTML tabel 3 blok. flt: all | ok | bad | off."""
+    rows = [s for s in sites if flt == "all" or s["status"] == flt]
+    n = per_block or max(1, -(-len(rows) // 3))
+    blocks = []
+    for k in range(3):
+        part = rows[k * n:(k + 1) * n]
+        if not part:
+            break
+        head = "<th>No</th><th>Site</th>" + "".join(f"<th>{x}</th>" for x in COLS)
+        body = "".join(
+            f"<tr><td>{html.escape(s['no'])}</td>"
+            f"<td title=\"{html.escape(s['reg'])}\">{html.escape(s['site'])}</td>"
+            + "".join(
+                f"<td><span class=\"p {('', 'r', 'n', 'y', 'o')[st]}\" "
+                f"title=\"{COLS[i]}\">{html.escape(str(t))}</span></td>"
+                for i, (t, st) in enumerate(s["cells"]))
+            + "</tr>" for s in part)
+        blocks.append(f"<table class=\"ms\"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>")
+    return "<div class=\"gr\">" + "".join(blocks) + "</div>"
  
