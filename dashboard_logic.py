@@ -55,7 +55,7 @@ def cells(d):
     elif "TIDAK" in ls:
         out.append(("Aman", 0))
     elif "RAWAN" in ls:
-        out.append(("Rawan", 1))
+        out.append(("Rawan", 3))
     else:
         out.append(NA)
     gd = num(d["ground"])
