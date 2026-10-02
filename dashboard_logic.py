@@ -69,7 +69,7 @@ def cells(d):
     hm = num(d["hammer"])
     out.append(NA if hm is None else (f"{hm:g}", 0 if hm >= 200 else 3 if hm >= 150 else 4 if hm >= 100 else 1))  # K-200
     tw = d["tower"].upper()
-    out.append(("OK", 0) if tw == "OK" else ("Minor", 1) if tw == "MINOR" else NA)
+    out.append(("OK", 0) if tw == "OK" else ("Minor", 3) if tw == "MINOR" else ("Major", 1) if tw == "MAJOR" else NA)
     out.append(triple(d["cctv"]))
     out.append(("OK", 0) if d["ac"].upper() == "OK" else NA)
     return out
