@@ -94,7 +94,8 @@ def parse(values):
            "rect": ix("RECTIFIER"), "genset": ix("GENSET"), "longsor": ix("LONGSOR"),
            "ground": ix("GROUNDING"), "vert": ix("VERTICALITY"), "hammer": ix("HAMMER"),
            "tower": ix("KELENGKAPAN"), "cctv": ix("CCTV"),
-           "ac": next((i for i, c in enumerate(h) if c.endswith("STATUS AC")), -1)}
+           "ac": next((i for i, c in enumerate(h) if c.endswith("STATUS AC")), -1),
+           "helper": ix("HELPER COLUMN")}
     sites = []
     for r in values[hdr + 1:]:
         d = {k: (r[i].strip() if 0 <= i < len(r) else "") for k, i in col.items()}
@@ -103,7 +104,13 @@ def parse(values):
         c = cells(d)
         live = [x for x in c if x[1] != 2]
         d["cells"] = c
-        d["status"] = "off" if not live else "bad" if any(x[1] in (1, 4) for x in live) else "ok"  # warning/critical = ada merah atau oranye
+        hp = d["helper"].upper()  # kolom HELPER COLUMN di sheet: "ADA ISSUE" / "AMAN"
+        if hp.startswith("ADA ISSUE"):
+            d["status"] = "bad"
+        elif hp.startswith("AMAN"):
+            d["status"] = "ok"
+        else:  # jika kolom tidak ada/kosong: pakai warna (merah/oranye = warning)
+            d["status"] = "off" if not live else "bad" if any(x[1] in (1, 4) for x in live) else "ok"
         sites.append(d)
     return sites
  
