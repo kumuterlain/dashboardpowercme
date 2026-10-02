@@ -34,7 +34,8 @@ table.ms td{{color:#1f2937;padding:.2em .1em;text-align:center;white-space:nowra
 table.ms th:nth-child(-n+2),table.ms td:nth-child(-n+2){{text-align:left}}
 table.ms td:nth-child(1){{color:#6b7280;padding-right:.4em}}
 .p{{display:inline-block;min-width:3em;padding:.08em .45em;border-radius:1em;color:#fff;font-weight:600;font-size:.92em;background:{OK}}}
-.p.y{{background:#eab308;color:#1f2937}}.p.o{{background:#f97316}}.p.r{{background:{BAD}}}.p.n{{background:{NA_BG};color:#6b7280}}
+.p.y{{background:#eab308;color:#1f2937}}.p.o{{background:#f97316}}.p.r{{background:{BAD};animation:blink 1.2s ease-in-out infinite}}
+@keyframes blink{{0%,100%{{opacity:1;box-shadow:0 0 .2em rgba(239,68,68,.5)}}50%{{opacity:.7;box-shadow:0 0 .9em .25em rgba(239,68,68,.95)}}}}.p.n{{background:{NA_BG};color:#6b7280}}
 .lg{{display:flex;gap:1.2em;color:#6b7280;font-size:.92em;align-items:center;flex-wrap:wrap;margin-top:.5em}}
 .lg i{{display:inline-block;width:.8em;height:.8em;margin-right:.3em}}
 </style>""", unsafe_allow_html=True)
