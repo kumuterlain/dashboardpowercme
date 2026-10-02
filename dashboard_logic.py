@@ -51,7 +51,7 @@ def cells(d):
     out.append(NA if gh is None else (f"{gh:g}", 1 if gh > 20 else 0))
     ls = d["longsor"].upper()
     if "SANGAT" in ls:
-        out.append(("Sangat", 1))
+        out.append(("Sangat Rawan", 1))
     elif "TIDAK" in ls:
         out.append(("Aman", 0))
     elif "RAWAN" in ls:
