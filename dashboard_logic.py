@@ -27,8 +27,26 @@ def triple(raw):
     return (re.sub(r"\s+", "", raw), 1 if any(x > 0 for x in n[1:]) else 0)
 
 
+def battery(raw):
+    """Warna battery berdasar rasio angka ke-2 / angka ke-1.
+    0 = hijau; <=0.25 kuning(3); <=0.5 oranye(4); >0.5 merah(1)."""
+    n = nums(raw)
+    if not n or len(n) < 2:
+        return NA
+    inst, u = n[0], n[1]
+    txt = re.sub(r"\s+", "", raw)
+    if u == 0:
+        return (txt, 0)
+    q = u / inst if inst > 0 else float("inf")
+    if q <= 0.25:
+        return (txt, 3)
+    if 0.1 < q <= 0.5:
+        return (txt, 4)
+    return (txt, 1)
+
+
 def cells(d):
-    out = [triple(d["bat"]), triple(d["mppt"]), triple(d["hfsm"]), triple(d["rect"])]
+    out = [battery(d["bat"]), triple(d["mppt"]), triple(d["hfsm"]), triple(d["rect"])]
     gh = num(d["genset"])
     out.append(NA if gh is None else (f"{gh:g}", 1 if gh > 20 else 0))
     ls = d["longsor"].upper()
@@ -81,7 +99,7 @@ def parse(values):
         c = cells(d)
         live = [x for x in c if x[1] != 2]
         d["cells"] = c
-        d["status"] = "off" if not live else "bad" if any(x[1] == 1 for x in live) else "ok"
+        d["status"] = "off" if not live else "bad" if any(x[1] in (1, 3, 4) for x in live) else "ok"
         sites.append(d)
     return sites
 
@@ -100,7 +118,7 @@ def render(sites, flt="all", per_block=None):
             f"<tr><td>{html.escape(s['no'])}</td>"
             f"<td title=\"{html.escape(s['reg'])}\">{html.escape(s['site'])}</td>"
             + "".join(
-                f"<td><span class=\"p {'r' if st == 1 else 'n' if st == 2 else ''}\" "
+                f"<td><span class=\"p {('', 'r', 'n', 'y', 'o')[st]}\" "
                 f"title=\"{COLS[i]}\">{html.escape(str(t))}</span></td>"
                 for i, (t, st) in enumerate(s["cells"]))
             + "</tr>" for s in part)
