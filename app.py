@@ -34,7 +34,7 @@ table.ms td{{color:#1f2937;padding:.2em .1em;text-align:center;white-space:nowra
 table.ms th:nth-child(-n+2),table.ms td:nth-child(-n+2){{text-align:left}}
 table.ms td:nth-child(1){{color:#6b7280;padding-right:.4em}}
 .p{{display:inline-block;min-width:3em;padding:.08em .45em;border-radius:1em;color:#fff;font-weight:600;font-size:.92em;background:{OK}}}
-.p.y{{background:#eab308;color:#1f2937}}.p.o{{background:#f97316}}.p.r{{background:{BAD}}}.p.n{{background:{NA_BG};color:#6b7280}}
+.p.y{{background:#eab308;color:#1f2937}}.p.o{{background:#f97316}}.p.r{{background:{BAD}}}.p.n{{background:transparent;color:#6b7280}}
 .lg{{display:flex;gap:1.2em;color:#6b7280;font-size:.92em;align-items:center;flex-wrap:wrap;margin-top:.5em}}
 .lg i{{display:inline-block;width:.8em;height:.8em;margin-right:.3em}}
 </style>""", unsafe_allow_html=True)
@@ -83,7 +83,8 @@ def dashboard():
         f"<span><i style='background:#eab308'></i>Kuning ≤25%</span>"
         f"<span><i style='background:#f97316'></i>Oranye ≤50%</span>"
         f"<span><i style='background:{BAD}'></i>Bermasalah</span>"
-        f"<span><i style='background:{NA_BG}'></i>Unmonitor / N/A / NY</span>"
+        f"<span><i style='background:#f97316'></i>NY</span>"
+        f"<span><b style='color:#6b7280'>N/A</b> = tidak ada data</span>"
         f"<span style='margin-left:auto'>{stamp}</span></div>",
         unsafe_allow_html=True)
  
