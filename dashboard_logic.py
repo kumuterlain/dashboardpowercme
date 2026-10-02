@@ -2,7 +2,11 @@
 import html
 import re
  
-NA = ("-", 2)  # (teks, status) status: 0 normal, 1 bermasalah, 2 N/A
+# status: 0 normal, 1 merah, 2 N/A (teks abu), 3 kuning, 4 oranye, 5 NY (oranye)
+ 
+ 
+def nz(raw):
+    return ("NY", 5) if (raw or "").strip().upper() == "NY" else ("N/A", 2)
 COLS = ["Battery", "MPPT", "HFSM", "Rectifier", "Genset(h)", "Longsor",
         "Ground(Ω)", "Vertical", "Hammer", "Tower", "CCTV", "AC"]
  
@@ -23,7 +27,7 @@ def triple(raw):
     """Format terpasang/un-mon/(faulty): merah jika un-mon atau faulty > 0."""
     n = nums(raw)
     if not n:
-        return NA
+        return nz(raw)
     return (re.sub(r"\s+", "", raw), 1 if any(x > 0 for x in n[1:]) else 0)
  
  
@@ -32,7 +36,7 @@ def battery(raw):
     0 = hijau; <=0.25 kuning(3); <=0.5 oranye(4); >0.5 merah(1)."""
     n = nums(raw)
     if not n or len(n) < 2:
-        return NA
+        return nz(raw)
     inst, u = n[0], max(n[1:3])  # un-mon atau faulty (mana lebih besar)
     txt = re.sub(r"\s+", "", raw)
     if u == 0:
@@ -48,7 +52,7 @@ def battery(raw):
 def cells(d):
     out = [battery(d["bat"]), battery(d["mppt"]), battery(d["hfsm"]), battery(d["rect"])]
     gh = num(d["genset"])
-    out.append(NA if gh is None else (f"{gh:g}", 1 if gh > 20 else 0))
+    out.append(nz(d["genset"]) if gh is None else (f"{gh:g}", 1 if gh > 20 else 0))
     ls = d["longsor"].upper()
     if "SANGAT" in ls:
         out.append(("Sangat", 1))
@@ -57,17 +61,17 @@ def cells(d):
     elif "RAWAN" in ls:
         out.append(("Rawan", 1))
     else:
-        out.append(NA)
+        out.append(nz(d["longsor"]))
     gd = num(d["ground"])
-    out.append(NA if gd is None else (f"{gd:g}", 1 if gd >= 1 else 0))
+    out.append(nz(d["ground"]) if gd is None else (f"{gd:g}", 1 if gd >= 1 else 0))
     v = nums(d["vert"])
-    out.append((f"{v[1]:g}/{v[0]:g}", 1 if v[1] >= v[0] else 0) if v and len(v) >= 2 else NA)
+    out.append((f"{v[1]:g}/{v[0]:g}", 1 if v[1] >= v[0] else 0) if v and len(v) >= 2 else nz(d["vert"]))
     hm = num(d["hammer"])
-    out.append(NA if hm is None else (f"{hm:g}", 0 if hm >= 200 else 3 if hm >= 150 else 4 if hm >= 100 else 1))  # K-200
+    out.append(nz(d["hammer"]) if hm is None else (f"{hm:g}", 0 if hm >= 200 else 3 if hm >= 150 else 4 if hm >= 100 else 1))  # K-200
     tw = d["tower"].upper()
-    out.append(("OK", 0) if tw == "OK" else ("Minor", 1) if tw == "MINOR" else NA)
+    out.append(("OK", 0) if tw == "OK" else ("Minor", 1) if tw == "MINOR" else nz(d["tower"]))
     out.append(triple(d["cctv"]))
-    out.append(("OK", 0) if d["ac"].upper() == "OK" else NA)
+    out.append(("OK", 0) if d["ac"].upper() == "OK" else nz(d["ac"]))
     return out
  
  
@@ -99,7 +103,7 @@ def parse(values):
         c = cells(d)
         live = [x for x in c if x[1] != 2]
         d["cells"] = c
-        d["status"] = "off" if not live else "bad" if any(x[1] in (1, 3, 4) for x in live) else "ok"
+        d["status"] = "off" if not live else "bad" if any(x[1] in (1, 3, 4, 5) for x in live) else "ok"
         sites.append(d)
     return sites
  
@@ -118,9 +122,10 @@ def render(sites, flt="all", per_block=None):
             f"<tr><td>{html.escape(s['no'])}</td>"
             f"<td title=\"{html.escape(s['reg'])}\">{html.escape(s['site'])}</td>"
             + "".join(
-                f"<td><span class=\"p {('', 'r', 'n', 'y', 'o')[st]}\" "
+                f"<td><span class=\"p {('', 'r', 'n', 'y', 'o', 'o')[st]}\" "
                 f"title=\"{COLS[i]}\">{html.escape(str(t))}</span></td>"
                 for i, (t, st) in enumerate(s["cells"]))
             + "</tr>" for s in part)
         blocks.append(f"<table class=\"ms\"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>")
     return "<div class=\"gr\">" + "".join(blocks) + "</div>"
+ 
