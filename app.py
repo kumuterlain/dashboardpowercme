@@ -32,10 +32,6 @@ table.ms{{border-collapse:collapse;width:100%;font-size:var(--f);margin:0}}
 table.ms th{{color:#1f2937;font-size:.92em;text-align:center;padding:.2em .1em;white-space:nowrap;border:0;background:transparent}}
 table.ms td{{color:#1f2937;padding:.2em .1em;text-align:center;white-space:nowrap;border:0;border-bottom:1px solid #e5e7eb;vertical-align:middle}}
 table.ms th:nth-child(-n+2),table.ms td:nth-child(-n+2){{text-align:left}}
-table.ms th{{min-width:3.6em}}
-table.ms tr.sub th{{font-size:.58em;font-weight:400;color:#6b7280;white-space:normal;vertical-align:top;line-height:1.15;padding:0 .1em .4em;min-width:0}}
-table.ms .sb{{width:0;min-width:100%;overflow-wrap:anywhere;text-align:center}}
-table.ms thead tr:last-child th{{border-bottom:1px solid #9ca3af}}
 table.ms td:nth-child(1){{color:#6b7280;padding-right:.4em}}
 .p{{display:inline-block;min-width:3em;padding:.08em .45em;border-radius:1em;color:#fff;font-weight:600;font-size:.92em;background:{OK}}}
 .p.y{{background:#eab308;color:#1f2937}}.p.o{{background:#f97316}}.p.r{{background:{BAD};animation:blink 1.2s ease-in-out infinite}}
