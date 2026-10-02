@@ -9,6 +9,7 @@ from dashboard_logic import parse, render
  
 # ====== PENGATURAN ======
 SHEET_ID = "1qMNpvZnB_0TP8tpt8UYkTpRyKQSsjpF529x8FNQbqkw"
+WORKSHEET = "Power & CME"   # nama tab yang dibaca (harus sama persis dengan nama tab di Google Sheet)
 REFRESH_SECONDS = 60          # interval auto-update
 TIMEZONE = "Asia/Jakarta"
 # Warna (ubah sesuai selera)
@@ -46,7 +47,7 @@ def load_values():
     creds = Credentials.from_service_account_info(
         dict(st.secrets["gcp_service_account"]),
         scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
-    ws = gspread.authorize(creds).open_by_key(SHEET_ID).get_worksheet(0)  # sheet paling kiri
+    ws = gspread.authorize(creds).open_by_key(SHEET_ID).worksheet(WORKSHEET)
     return ws.get_all_values()
  
  
