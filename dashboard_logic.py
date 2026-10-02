@@ -1,39 +1,39 @@
 """Logika parsing sheet + render HTML (tanpa dependensi Streamlit, mudah diuji)."""
 import html
 import re
-
+ 
 NA = ("-", 2)  # (teks, status) status: 0 normal, 1 bermasalah, 2 N/A
 COLS = ["Battery", "MPPT", "HFSM", "Rectifier", "Genset(h)", "Longsor",
         "Ground(Ω)", "Vertical", "Hammer", "Tower", "CCTV", "AC"]
-
-
+ 
+ 
 def nums(s):
     v = re.findall(r"\d+(?:\.\d+)?", s or "")
     return [float(x) for x in v] if v else None
-
-
+ 
+ 
 def num(s):
     try:
         return float(str(s).strip().replace(",", "."))
     except ValueError:
         return None
-
-
+ 
+ 
 def triple(raw):
     """Format terpasang/un-mon/(faulty): merah jika un-mon atau faulty > 0."""
     n = nums(raw)
     if not n:
         return NA
     return (re.sub(r"\s+", "", raw), 1 if any(x > 0 for x in n[1:]) else 0)
-
-
+ 
+ 
 def battery(raw):
-    """Warna battery berdasar rasio angka ke-2 / angka ke-1.
+    """Warna Battery/MPPT/HFSM/Rectifier berdasar rasio (un-mon/faulty terbesar) / terpasang.
     0 = hijau; <=0.25 kuning(3); <=0.5 oranye(4); >0.5 merah(1)."""
     n = nums(raw)
     if not n or len(n) < 2:
         return NA
-    inst, u = n[0], n[1]
+    inst, u = n[0], max(n[1:3])  # un-mon atau faulty (mana lebih besar)
     txt = re.sub(r"\s+", "", raw)
     if u == 0:
         return (txt, 0)
@@ -43,10 +43,10 @@ def battery(raw):
     if 0.1 < q <= 0.5:
         return (txt, 4)
     return (txt, 1)
-
-
+ 
+ 
 def cells(d):
-    out = [battery(d["bat"]), triple(d["mppt"]), triple(d["hfsm"]), triple(d["rect"])]
+    out = [battery(d["bat"]), battery(d["mppt"]), battery(d["hfsm"]), battery(d["rect"])]
     gh = num(d["genset"])
     out.append(NA if gh is None else (f"{gh:g}", 1 if gh > 20 else 0))
     ls = d["longsor"].upper()
@@ -69,8 +69,8 @@ def cells(d):
     out.append(triple(d["cctv"]))
     out.append(("OK", 0) if d["ac"].upper() == "OK" else NA)
     return out
-
-
+ 
+ 
 def parse(values):
     """values = list of baris (list of string) dari sheet pertama."""
     hdr = next((i for i, r in enumerate(values)
@@ -78,13 +78,13 @@ def parse(values):
     if hdr is None:
         raise ValueError("Header 'SITE NAME' tidak ditemukan di sheet pertama.")
     h = [c.strip().upper() for c in values[hdr]]
-
+ 
     def ix(key, exact=False):
         for i, c in enumerate(h):
             if (c == key) if exact else (key in c):
                 return i
         return -1
-
+ 
     col = {"no": ix("NO", True), "site": ix("SITE NAME"), "reg": ix("REGIONAL"),
            "bat": ix("BATTERY"), "mppt": ix("MPPT"), "hfsm": ix("HFSM"),
            "rect": ix("RECTIFIER"), "genset": ix("GENSET"), "longsor": ix("LONGSOR"),
@@ -102,8 +102,8 @@ def parse(values):
         d["status"] = "off" if not live else "bad" if any(x[1] in (1, 3, 4) for x in live) else "ok"
         sites.append(d)
     return sites
-
-
+ 
+ 
 def render(sites, flt="all", per_block=None):
     """Kembalikan HTML tabel 3 blok. flt: all | ok | bad | off."""
     rows = [s for s in sites if flt == "all" or s["status"] == flt]
