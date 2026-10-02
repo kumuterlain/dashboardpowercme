@@ -61,7 +61,12 @@ def cells(d):
     gd = num(d["ground"])
     out.append(NA if gd is None else (f"{gd:g}", 1 if gd >= 1 else 0))
     v = nums(d["vert"])
-    out.append((f"{v[1]:g}/{v[0]:g}", 1 if v[1] >= v[0] else 0) if v and len(v) >= 2 else NA)
+    if v and len(v) >= 2:
+        q = v[1] / v[0] if v[0] > 0 else (float("inf") if v[1] > 0 else 0)
+        # hasil/limit: <50% hijau, 50-<75% kuning, 75-<100% oranye, >=100% merah
+        out.append((f"{v[1]:g}/{v[0]:g}", 1 if q >= 1 else 4 if q >= 0.75 else 3 if q >= 0.5 else 0))
+    else:
+        out.append(NA)
     hm = num(d["hammer"])
     out.append(NA if hm is None else (f"{hm:g}", 0 if hm >= 200 else 3 if hm >= 150 else 4 if hm >= 100 else 1))  # K-200
     tw = d["tower"].upper()
