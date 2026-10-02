@@ -51,7 +51,7 @@ def cells(d):
     out.append(NA if gh is None else (f"{gh:g}", 1 if gh > 20 else 0))
     ls = d["longsor"].upper()
     if "SANGAT" in ls:
-        out.append(("Sangat Rawan", 1))
+        out.append(("Sangat", 1))
     elif "TIDAK" in ls:
         out.append(("Aman", 0))
     elif "RAWAN" in ls:
@@ -63,7 +63,7 @@ def cells(d):
     v = nums(d["vert"])
     out.append((f"{v[1]:g}/{v[0]:g}", 1 if v[1] >= v[0] else 0) if v and len(v) >= 2 else NA)
     hm = num(d["hammer"])
-    out.append(NA if hm is None else (f"{hm:g}", 1 if hm < 200 else 0))
+    out.append(NA if hm is None else (f"{hm:g}", 0 if hm >= 200 else 3 if hm >= 150 else 4 if hm >= 100 else 1))  # K-200
     tw = d["tower"].upper()
     out.append(("OK", 0) if tw == "OK" else ("Minor", 1) if tw == "MINOR" else NA)
     out.append(triple(d["cctv"]))
