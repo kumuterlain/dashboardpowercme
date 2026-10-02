@@ -103,7 +103,7 @@ def parse(values):
         c = cells(d)
         live = [x for x in c if x[1] != 2]
         d["cells"] = c
-        d["status"] = "off" if not live else "bad" if any(x[1] in (1, 3, 4) for x in live) else "ok"
+        d["status"] = "off" if not live else "bad" if any(x[1] in (1, 4) for x in live) else "ok"  # warning/critical = ada merah atau oranye
         sites.append(d)
     return sites
  
