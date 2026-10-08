@@ -1,32 +1,34 @@
 """Logika parsing sheet + render HTML (tanpa dependensi Streamlit, mudah diuji)."""
 import html
 import re
- 
+
 NA = ("-", 2)  # (teks, status) status: 0 normal, 1 merah, 2 N/A, 3 kuning, 4 oranye
 COLS = ["Battery", "MPPT", "HFSM", "Rectifier", "Genset(h)", "Longsor",
         "Ground(Ω)", "Vertical", "Hammer", "Tower", "CCTV", "AC"]
- 
- 
+
+VERT_TOLERANSI_PERSEN = 0.10  # toleransi 10% di atas limit vertikal: masih dianggap hijau
+
+
 def nums(s):
     v = re.findall(r"\d+(?:\.\d+)?", s or "")
     return [float(x) for x in v] if v else None
- 
- 
+
+
 def num(s):
     try:
         return float(str(s).strip().replace(",", "."))
     except ValueError:
         return None
- 
- 
+
+
 def triple(raw):
     """Format terpasang/un-mon/(faulty): merah jika un-mon atau faulty > 0."""
     n = nums(raw)
     if not n:
         return NA
     return (re.sub(r"\s+", "", raw), 1 if any(x > 0 for x in n[1:]) else 0)
- 
- 
+
+
 def battery(raw):
     """Warna Battery/MPPT/HFSM/Rectifier berdasar rasio (un-mon/faulty terbesar) / terpasang.
     0 = hijau; <=0.25 kuning(3); <=0.5 oranye(4); >0.5 merah(1)."""
@@ -43,8 +45,8 @@ def battery(raw):
     if 0.1 < q <= 0.5:
         return (txt, 4)
     return (txt, 1)
- 
- 
+
+
 def cells(d):
     out = [battery(d["bat"]), battery(d["mppt"]), battery(d["hfsm"]), battery(d["rect"])]
     gh = num(d["genset"])
@@ -62,8 +64,10 @@ def cells(d):
     out.append(NA if gd is None else (f"{gd:g}", 1 if gd >= 1 else 0))
     v = nums(d["vert"])
     if v and len(v) >= 2:
-        # limit/hasil: hasil <= limit hijau, hasil > limit merah
-        out.append((f"{v[0]:g}/{v[1]:g}", 1 if v[1] > v[0] else 0))
+        # limit/hasil: hasil <= limit (+ toleransi) hijau, selebihnya merah
+        limit, hasil = v[0], v[1]
+        batas_aman = limit * (1 + VERT_TOLERANSI_PERSEN)
+        out.append((f"{limit:g}/{hasil:g}", 1 if hasil > batas_aman else 0))
     else:
         out.append(NA)
     hm = num(d["hammer"])
@@ -73,8 +77,8 @@ def cells(d):
     out.append(triple(d["cctv"]))
     out.append(("OK", 0) if d["ac"].upper() == "OK" else NA)
     return out
- 
- 
+
+
 def parse(values):
     """values = list of baris (list of string) dari sheet pertama."""
     hdr = next((i for i, r in enumerate(values)
@@ -82,13 +86,13 @@ def parse(values):
     if hdr is None:
         raise ValueError("Header 'SITE NAME' tidak ditemukan di sheet pertama.")
     h = [c.strip().upper() for c in values[hdr]]
- 
+
     def ix(key, exact=False):
         for i, c in enumerate(h):
             if (c == key) if exact else (key in c):
                 return i
         return -1
- 
+
     col = {"no": ix("NO", True), "site": ix("SITE NAME"), "reg": ix("REGIONAL"),
            "bat": ix("BATTERY"), "mppt": ix("MPPT"), "hfsm": ix("HFSM"),
            "rect": ix("RECTIFIER"), "genset": ix("GENSET"), "longsor": ix("LONGSOR"),
@@ -113,8 +117,8 @@ def parse(values):
             d["status"] = "off" if not live else "bad" if any(x[1] in (1, 4) for x in live) else "ok"
         sites.append(d)
     return sites
- 
- 
+
+
 def render(sites, flt="all", per_block=None):
     """Kembalikan HTML tabel 3 blok. flt: all | ok | bad | off."""
     rows = [s for s in sites if flt == "all" or s["status"] == flt]
@@ -135,4 +139,3 @@ def render(sites, flt="all", per_block=None):
             + "</tr>" for s in part)
         blocks.append(f"<table class=\"ms\"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>")
     return "<div class=\"gr\">" + "".join(blocks) + "</div>"
- 
