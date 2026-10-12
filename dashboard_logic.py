@@ -30,7 +30,7 @@ def triple(raw):
 
 
 def battery(raw):
-    """Warna Battery/MPPT/HFSM/Rectifier berdasar rasio (un-mon/faulty terbesar) / terpasang.
+    """Warna MPPT/HFSM/Rectifier berdasar rasio (un-mon/faulty terbesar) / terpasang.
     0 = hijau; <=0.25 kuning(3); <=0.5 oranye(4); >0.5 merah(1)."""
     n = nums(raw)
     if not n or len(n) < 2:
@@ -47,8 +47,31 @@ def battery(raw):
     return (txt, 1)
 
 
+def battery_pack(raw):
+    """Khusus kolom Battery. Format 'INSTALLED/UNMON/FAULTY', contoh '8/1/1' atau '8/0/0'.
+    Persen faulty dihitung dari total (installed + unmon + faulty).
+    0 = hijau; 3 = kuning; 4 = oranye; 1 = merah."""
+    n = nums(raw)
+    if not n:
+        return NA
+    inst, unmon, faulty = (n + [0, 0])[:3]
+    total = inst + unmon + faulty
+    if total <= 0:
+        return NA
+    txt = re.sub(r"\s+", "", raw)
+    if faulty > 0:
+        if faulty * 4 <= total:      # 1% - 25%
+            return (txt, 3)
+        if faulty * 2 <= total:      # 26% - 50%
+            return (txt, 4)
+        return (txt, 1)              # 51% - 100%
+    if unmon > 0:                    # tidak ada faulty, tapi ada unmon
+        return (txt, 3)
+    return (txt, 0)                  # semua installed, tidak ada unmon/faulty
+
+
 def cells(d):
-    out = [battery(d["bat"]), battery(d["mppt"]), battery(d["hfsm"]), battery(d["rect"])]
+    out = [battery_pack(d["bat"]), battery(d["mppt"]), battery(d["hfsm"]), battery(d["rect"])]
     gh = num(d["genset"])
     out.append(NA if gh is None else (f"{gh:g}", 1 if gh > 20 else 0))
     ls = d["longsor"].upper()
