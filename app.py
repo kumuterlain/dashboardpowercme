@@ -1,12 +1,12 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
- 
+
 import gspread
 import streamlit as st
 from google.oauth2.service_account import Credentials
- 
+
 from dashboard_logic import parse, render
- 
+
 # ====== PENGATURAN ======
 SHEET_ID = "1qMNpvZnB_0TP8tpt8UYkTpRyKQSsjpF529x8FNQbqkw"
 WORKSHEET = "Power & CME"   # nama tab yang dibaca (harus sama persis dengan nama tab di Google Sheet)
@@ -17,9 +17,9 @@ BG, OK, BAD, NA_BG = "#ffffff", "#16a34a", "#ef4444", "#d1d5db"
 TITLE = "Monitoring Issue Power & CME"
 HIGHLIGHT = "#fde047"  # warna highlight judul
 # ========================
- 
+
 st.set_page_config(page_title=TITLE, layout="wide", initial_sidebar_state="collapsed")
- 
+
 st.markdown(f"""<style>
 :root{{--f:clamp(11px,.62vw,18px)}}
 .stApp{{background:{BG}}}
@@ -37,29 +37,34 @@ table.ms td:nth-child(1){{color:#6b7280;padding-right:.4em}}
 .p{{display:inline-block;min-width:3em;padding:.08em .45em;border-radius:1em;color:#fff;font-weight:600;font-size:.92em;background:{OK}}}
 .p.y{{background:#eab308;color:#1f2937}}.p.o{{background:#f97316}}.p.r{{background:{BAD};animation:blink 1.2s ease-in-out infinite}}
 @keyframes blink{{0%,100%{{opacity:1;box-shadow:0 0 .2em rgba(239,68,68,.5)}}50%{{opacity:.7;box-shadow:0 0 .9em .25em rgba(239,68,68,.95)}}}}.p.n{{background:{NA_BG};color:#6b7280}}
+a.p{{text-decoration:none!important;color:#fff!important;cursor:pointer}}
+a.p.y{{color:#1f2937!important}}a.p.n{{color:#6b7280!important}}
+a.p:hover{{filter:brightness(.88);box-shadow:0 0 0 .15em rgba(0,0,0,.15)}}
 .lg{{display:flex;gap:1.2em;color:#6b7280;font-size:.92em;align-items:center;flex-wrap:wrap;margin-top:.5em}}
 .lg i{{display:inline-block;width:.8em;height:.8em;margin-right:.3em}}
 </style>""", unsafe_allow_html=True)
- 
- 
+
+
 @st.cache_data(ttl=30, show_spinner=False)
 def load_values():
     creds = Credentials.from_service_account_info(
         dict(st.secrets["gcp_service_account"]),
         scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
     ws = gspread.authorize(creds).open_by_key(SHEET_ID).worksheet(WORKSHEET)
-    return ws.get_all_values()
- 
- 
+    return ws.get_all_values(), ws.id
+
+
 LABELS = {"Semua": "all", "Normal": "ok", "Warning/Critical": "bad"}
- 
- 
+
+
 @st.fragment(run_every=REFRESH_SECONDS)
 def dashboard():
     err = None
     try:
-        sites = parse(load_values())
+        values, gid = load_values()
+        sites = parse(values)
         st.session_state["last_sites"] = sites
+        st.session_state["last_url"] = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit#gid={gid}"
         st.session_state["last_time"] = datetime.now(ZoneInfo(TIMEZONE))
     except Exception as e:  # tampilkan data terakhir jika ada
         sites, err = st.session_state.get("last_sites"), e
@@ -77,20 +82,20 @@ def dashboard():
         "</div>",
         unsafe_allow_html=True)
     pick = st.session_state.get("flt", "Semua")
-    st.markdown(render(sites, LABELS[pick]), unsafe_allow_html=True)
+    st.markdown(render(sites, LABELS[pick], base_url=st.session_state.get("last_url")),
+                unsafe_allow_html=True)
     t = st.session_state.get("last_time")
     stamp = f"Diperbarui otomatis tiap {REFRESH_SECONDS} detik · terakhir {t:%H:%M:%S}" if t else ""
     st.markdown(
         f"<div class='lg'><span><i style='background:{OK}'></i>Normal</span>"
         f"<span><i style='background:#eab308'></i>Kuning ≤25%</span>"
         f"<span><i style='background:#f97316'></i>Orange ≤50%</span>"
-        f"<span><i style='background:{BAD}'></i>Warning</span>"
+        f"<span><i style='background:{BAD}'></i>Warning/Critical (klik untuk buka data asal)</span>"
         f"<span><i style='background:{NA_BG}'></i>N/A / NY</span>"
         f"<span style='margin-left:auto'>{stamp}</span></div>",
         unsafe_allow_html=True)
- 
- 
+
+
 # Filter ada di sidebar (panah kecil kiri atas); sidebar tidak boleh dipanggil dari dalam fragment
 st.sidebar.radio("Filter site", list(LABELS), key="flt")
 dashboard()
- 
