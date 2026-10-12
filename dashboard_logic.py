@@ -5,12 +5,19 @@ import re
 NA = ("-", 2)  # (teks, status) status: 0 normal, 1 merah, 2 N/A, 3 kuning, 4 oranye
 COLS = ["Battery", "MPPT", "HFSM", "Rectifier", "Genset(h)", "Longsor",
         "Ground(Ω)", "Vertical", "Hammer", "Tower", "CCTV", "AC"]
+# Kunci kolom sheet untuk tiap bubble, urutannya sama dengan COLS
+CELL_KEYS = ["bat", "mppt", "hfsm", "rect", "genset", "longsor",
+             "ground", "vert", "hammer", "tower", "cctv", "ac"]
 
 VERT_TOLERANSI = 10  # toleransi absolut di atas limit vertikal: hasil <= limit + 10 masih hijau
 
 # Skala warna (rendah 1-25%, sedang 26-50%, tinggi 51-100%) dari persen terhadap INSTALLED
 SKALA_UNMON = (0, 3, 4)    # hijau, kuning, oranye
 SKALA_FAULTY = (3, 4, 1)   # kuning, oranye, merah
+
+# Bubble dengan status ini bisa diklik -> buka sel asal di Google Sheet.
+# 1 = merah. Tambah 4 (oranye), 3 (kuning), atau 0 (hijau) kalau mau ikut bisa diklik.
+LINK_STATUS = (1,)
 
 
 def nums(s):
@@ -23,6 +30,15 @@ def num(s):
         return float(str(s).strip().replace(",", "."))
     except ValueError:
         return None
+
+
+def col_letter(j):
+    """Index kolom 0-based -> huruf kolom Excel/Sheets (0 -> A, 26 -> AA)."""
+    s, j = "", j + 1
+    while j:
+        j, r = divmod(j - 1, 26)
+        s = chr(65 + r) + s
+    return s
 
 
 def triple(raw):
@@ -120,13 +136,17 @@ def parse(values):
            "tower": ix("KELENGKAPAN"), "cctv": ix("CCTV"),
            "ac": next((i for i, c in enumerate(h) if c.endswith("STATUS AC")), -1)}
     sites = []
-    for r in values[hdr + 1:]:
+    for off, r in enumerate(values[hdr + 1:]):
         d = {k: (r[i].strip() if 0 <= i < len(r) else "") for k, i in col.items()}
         if not d["site"] or not d["no"].isdigit():
             continue
         c = cells(d)
         live = [x for x in c if x[1] != 2]
         d["cells"] = c
+        # Alamat sel asal (A1) untuk tiap bubble; baris sheet = index list + 1
+        sheet_row = hdr + 2 + off
+        d["cell_addr"] = [f"{col_letter(col[k])}{sheet_row}" if col[k] >= 0 else None
+                          for k in CELL_KEYS]
         # Status site hanya dari warna: ada sel merah (1) -> Warning/Critical.
         # Oranye (4) dan kuning (3) tidak dihitung.
         d["status"] = "off" if not live else "bad" if any(x[1] == 1 for x in live) else "ok"
@@ -134,8 +154,21 @@ def parse(values):
     return sites
 
 
-def render(sites, flt="all", per_block=None):
-    """Kembalikan HTML tabel 3 blok. flt: all | ok | bad | off."""
+def bubble(s, i, t, st, base_url):
+    """Satu bubble. Jika statusnya ada di LINK_STATUS dan base_url ada -> jadi link ke sel asal."""
+    cls = ('', 'r', 'n', 'y', 'o')[st]
+    txt = html.escape(str(t))
+    addr = s["cell_addr"][i] if s.get("cell_addr") else None
+    if base_url and addr and st in LINK_STATUS:
+        return (f"<a class=\"p {cls}\" href=\"{html.escape(base_url)}&amp;range={addr}\" "
+                f"target=\"_blank\" rel=\"noopener\" "
+                f"title=\"{COLS[i]} - klik untuk buka data asal ({addr})\">{txt}</a>")
+    return f"<span class=\"p {cls}\" title=\"{COLS[i]}\">{txt}</span>"
+
+
+def render(sites, flt="all", per_block=None, base_url=None):
+    """Kembalikan HTML tabel 3 blok. flt: all | ok | bad | off.
+    base_url: link sheet, contoh https://docs.google.com/spreadsheets/d/<ID>/edit#gid=<GID>"""
     rows = [s for s in sites if flt == "all" or s["status"] == flt]
     n = per_block or max(1, -(-len(rows) // 3))
     blocks = []
@@ -147,10 +180,8 @@ def render(sites, flt="all", per_block=None):
         body = "".join(
             f"<tr><td>{html.escape(s['no'])}</td>"
             f"<td title=\"{html.escape(s['reg'])}\">{html.escape(s['site'])}</td>"
-            + "".join(
-                f"<td><span class=\"p {('', 'r', 'n', 'y', 'o')[st]}\" "
-                f"title=\"{COLS[i]}\">{html.escape(str(t))}</span></td>"
-                for i, (t, st) in enumerate(s["cells"]))
+            + "".join(f"<td>{bubble(s, i, t, st, base_url)}</td>"
+                      for i, (t, st) in enumerate(s["cells"]))
             + "</tr>" for s in part)
         blocks.append(f"<table class=\"ms\"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>")
     return "<div class=\"gr\">" + "".join(blocks) + "</div>"
