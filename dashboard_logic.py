@@ -6,7 +6,7 @@ NA = ("-", 2)  # (teks, status) status: 0 normal, 1 merah, 2 N/A, 3 kuning, 4 or
 COLS = ["Battery", "MPPT", "HFSM", "Rectifier", "Genset(h)", "Longsor",
         "Ground(Ω)", "Vertical", "Hammer", "Tower", "CCTV", "AC"]
 
-VERT_TOLERANSI_PERSEN = 0.10  # toleransi 10% di atas limit vertikal: masih dianggap hijau
+VERT_TOLERANSI = 10  # toleransi absolut di atas limit vertikal: hasil <= limit + 10 masih hijau
 
 
 def nums(s):
@@ -53,7 +53,7 @@ def battery_pack(raw):
         if faulty * 2 <= total:      # 26% - 50%
             return (txt, 4)
         return (txt, 1)              # 51% - 100%
-    if unmon > 0:                    # tidak ada faulty, tapi ada unmon
+    if unmon > 0:                    # tanpa faulty, ada unmon
         return (txt, 3)
     return (txt, 0)                  # semua installed, tidak ada unmon/faulty
 
@@ -76,9 +76,9 @@ def cells(d):
     out.append(NA if gd is None else (f"{gd:g}", 1 if gd >= 1 else 0))
     v = nums(d["vert"])
     if v and len(v) >= 2:
-        # limit/hasil: hasil <= limit (+ toleransi) hijau, selebihnya merah
+        # format limit/result: result <= limit + toleransi -> hijau, selebihnya merah
         limit, hasil = v[0], v[1]
-        batas_aman = limit * (1 + VERT_TOLERANSI_PERSEN)
+        batas_aman = limit + VERT_TOLERANSI
         out.append((f"{limit:g}/{hasil:g}", 1 if hasil > batas_aman else 0))
     else:
         out.append(NA)
