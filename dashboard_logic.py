@@ -15,9 +15,26 @@ VERT_TOLERANSI = 10  # toleransi absolut di atas limit vertikal: hasil <= limit 
 SKALA_UNMON = (0, 3, 4)    # hijau, kuning, oranye
 SKALA_FAULTY = (3, 4, 1)   # kuning, oranye, merah
 
-# Bubble dengan status ini bisa diklik -> buka sel asal di Google Sheet.
+# Bubble dengan status ini bisa diklik -> buka sel di spreadsheet sumber.
 # 1 = merah. Tambah 4 (oranye), 3 (kuning), atau 0 (hijau) kalau mau ikut bisa diklik.
 LINK_STATUS = (1,)
+
+# Peta bubble -> data asli di spreadsheet MONITORING CME.
+#   tab   : nama tab sumber
+#   key   : header kolom nama site di tab itu
+#   col   : header kolom nilai yang dituju (cocok persis, atau diawali teks ini)
+#   after : (opsional) header jangkar; kolom nilai = kolom tepat setelah jangkar
+# Bubble yang tidak ada di sini (Battery, MPPT, HFSM, Rectifier, Genset, CCTV)
+# belum punya sumber -> tidak jadi link.
+LINK_MAP = {
+    "longsor": dict(tab="MONITORING CME", key="DESCRIPTION SITE", col="STATUS LONGSOR"),
+    "ground": dict(tab="MONITORING GROUNDING", key="DESCRIPTION SITE", col="RESULT"),
+    "vert": dict(tab="MONITORING VERTICALITY", key="DESCRIPTION SITE", col="HASIL VERTICALITY"),
+    "hammer": dict(tab="MONITORING HAMMER TEST", key="DESCRIPTION SITE", col="MUTU BETON"),
+    "tower": dict(tab="MONITORING CME", key="DESCRIPTION SITE", col="STATUS",
+                  after="STATUS INSTALASI"),
+    "ac": dict(tab="MONITORING AC", key="SITE NAME", col="STATUS AC"),
+}
 
 
 def nums(s):
@@ -136,17 +153,14 @@ def parse(values):
            "tower": ix("KELENGKAPAN"), "cctv": ix("CCTV"),
            "ac": next((i for i, c in enumerate(h) if c.endswith("STATUS AC")), -1)}
     sites = []
-    for off, r in enumerate(values[hdr + 1:]):
+    for r in values[hdr + 1:]:
         d = {k: (r[i].strip() if 0 <= i < len(r) else "") for k, i in col.items()}
         if not d["site"] or not d["no"].isdigit():
             continue
         c = cells(d)
         live = [x for x in c if x[1] != 2]
         d["cells"] = c
-        # Alamat sel asal (A1) untuk tiap bubble; baris sheet = index list + 1
-        sheet_row = hdr + 2 + off
-        d["cell_addr"] = [f"{col_letter(col[k])}{sheet_row}" if col[k] >= 0 else None
-                          for k in CELL_KEYS]
+        d["links"] = [None] * len(COLS)   # diisi attach_links()
         # Status site hanya dari warna: ada sel merah (1) -> Warning/Critical.
         # Oranye (4) dan kuning (3) tidak dihitung.
         d["status"] = "off" if not live else "bad" if any(x[1] == 1 for x in live) else "ok"
@@ -154,21 +168,80 @@ def parse(values):
     return sites
 
 
-def bubble(s, i, t, st, base_url):
-    """Satu bubble. Jika statusnya ada di LINK_STATUS dan base_url ada -> jadi link ke sel asal."""
+def _norm(s):
+    return " ".join(str(s).upper().split())
+
+
+def _canon(name):
+    """Samakan penulisan nama site antar-sheet (huruf besar, spasi, ejaan Kobagma/Kobakma)."""
+    return _norm(name).replace("KOBAKMA", "KOBAGMA")
+
+
+def _locate(values, key_hdr, col_hdr, after=None):
+    """Cari baris header di tab sumber. Return (index kolom nilai, {nama site: nomor baris})."""
+    for r, row in enumerate(values):
+        h = [_norm(c) for c in row]
+        if key_hdr not in h:
+            continue
+        kc = h.index(key_hdr)
+        if after:
+            if after not in h:
+                return None
+            cc = h.index(after) + 1
+            if cc >= len(h) or h[cc] != col_hdr:
+                return None
+        else:
+            cc = next((i for i, c in enumerate(h) if c == col_hdr), None)
+            if cc is None:
+                cc = next((i for i, c in enumerate(h) if c.startswith(col_hdr)), None)
+            if cc is None:
+                return None
+        rows = {}
+        for j in range(r + 1, len(values)):
+            v = values[j]
+            if kc < len(v) and v[kc].strip():
+                rows.setdefault(_canon(v[kc]), j + 1)   # nomor baris sheet = index + 1
+        return cc, rows
+    return None
+
+
+def attach_links(sites, src_id, src):
+    """Isi s['links'] (URL ke sel di spreadsheet sumber) untuk tiap bubble.
+    src = {nama_tab: {"values": [...], "gid": int}} dari spreadsheet MONITORING CME."""
+    located = {}
+    for k, cfg in LINK_MAP.items():
+        t = src.get(cfg["tab"])
+        if t:
+            located[k] = (_locate(t["values"], cfg["key"], cfg["col"], cfg.get("after")), t["gid"])
+    for s in sites:
+        links = []
+        for k in CELL_KEYS:
+            url = None
+            loc = located.get(k)
+            if loc and loc[0]:
+                (cc, rows), gid = loc
+                r = rows.get(_canon(s["site"]))
+                if r:
+                    url = (f"https://docs.google.com/spreadsheets/d/{src_id}/edit"
+                           f"?gid={gid}#gid={gid}&range={col_letter(cc)}{r}")
+            links.append(url)
+        s["links"] = links
+
+
+def bubble(s, i, t, st):
+    """Satu bubble. Jika statusnya ada di LINK_STATUS dan link sumber ada -> jadi link."""
     cls = ('', 'r', 'n', 'y', 'o')[st]
     txt = html.escape(str(t))
-    addr = s["cell_addr"][i] if s.get("cell_addr") else None
-    if base_url and addr and st in LINK_STATUS:
-        return (f"<a class=\"p {cls}\" href=\"{html.escape(base_url)}&amp;range={addr}\" "
+    url = s["links"][i] if s.get("links") else None
+    if url and st in LINK_STATUS:
+        return (f"<a class=\"p {cls}\" href=\"{html.escape(url)}\" "
                 f"target=\"_blank\" rel=\"noopener\" "
-                f"title=\"{COLS[i]} - klik untuk buka data asal ({addr})\">{txt}</a>")
+                f"title=\"{COLS[i]} - klik untuk buka data asal\">{txt}</a>")
     return f"<span class=\"p {cls}\" title=\"{COLS[i]}\">{txt}</span>"
 
 
-def render(sites, flt="all", per_block=None, base_url=None):
-    """Kembalikan HTML tabel 3 blok. flt: all | ok | bad | off.
-    base_url: link sheet, contoh https://docs.google.com/spreadsheets/d/<ID>/edit#gid=<GID>"""
+def render(sites, flt="all", per_block=None):
+    """Kembalikan HTML tabel 3 blok. flt: all | ok | bad | off."""
     rows = [s for s in sites if flt == "all" or s["status"] == flt]
     n = per_block or max(1, -(-len(rows) // 3))
     blocks = []
@@ -180,7 +253,7 @@ def render(sites, flt="all", per_block=None, base_url=None):
         body = "".join(
             f"<tr><td>{html.escape(s['no'])}</td>"
             f"<td title=\"{html.escape(s['reg'])}\">{html.escape(s['site'])}</td>"
-            + "".join(f"<td>{bubble(s, i, t, st, base_url)}</td>"
+            + "".join(f"<td>{bubble(s, i, t, st)}</td>"
                       for i, (t, st) in enumerate(s["cells"]))
             + "</tr>" for s in part)
         blocks.append(f"<table class=\"ms\"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>")
