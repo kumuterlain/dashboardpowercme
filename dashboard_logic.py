@@ -29,32 +29,20 @@ def triple(raw):
     return (re.sub(r"\s+", "", raw), 1 if any(x > 0 for x in n[1:]) else 0)
 
 
-def battery(raw):
-    """Warna MPPT/HFSM/Rectifier berdasar rasio (un-mon/faulty terbesar) / terpasang.
-    0 = hijau; <=0.25 kuning(3); <=0.5 oranye(4); >0.5 merah(1)."""
+def battery_pack(raw):
+    """Untuk kolom Battery, MPPT, HFSM, Rectifier.
+    Format 'INSTALLED/UNMON/FAULTY', contoh '8/1/1' atau '8/0/0'.
+    Persen faulty dihitung dari total (installed + unmon + faulty).
+    0 = hijau; 3 = kuning; 4 = oranye; 1 = merah.
+    - faulty 1-25%   -> kuning
+    - faulty 26-50%  -> oranye
+    - faulty 51-100% -> merah
+    - tanpa faulty, ada unmon -> kuning
+    - tanpa faulty & tanpa unmon -> hijau"""
     n = nums(raw)
     if not n or len(n) < 2:
         return NA
-    inst, u = n[0], max(n[1:3])  # un-mon atau faulty (mana lebih besar)
-    txt = re.sub(r"\s+", "", raw)
-    if u == 0:
-        return (txt, 0)
-    q = u / inst if inst > 0 else float("inf")
-    if q <= 0.25:
-        return (txt, 3)
-    if 0.1 < q <= 0.5:
-        return (txt, 4)
-    return (txt, 1)
-
-
-def battery_pack(raw):
-    """Khusus kolom Battery. Format 'INSTALLED/UNMON/FAULTY', contoh '8/1/1' atau '8/0/0'.
-    Persen faulty dihitung dari total (installed + unmon + faulty).
-    0 = hijau; 3 = kuning; 4 = oranye; 1 = merah."""
-    n = nums(raw)
-    if not n:
-        return NA
-    inst, unmon, faulty = (n + [0, 0])[:3]
+    inst, unmon, faulty = (n + [0])[:3]
     total = inst + unmon + faulty
     if total <= 0:
         return NA
@@ -71,7 +59,8 @@ def battery_pack(raw):
 
 
 def cells(d):
-    out = [battery_pack(d["bat"]), battery(d["mppt"]), battery(d["hfsm"]), battery(d["rect"])]
+    out = [battery_pack(d["bat"]), battery_pack(d["mppt"]),
+           battery_pack(d["hfsm"]), battery_pack(d["rect"])]
     gh = num(d["genset"])
     out.append(NA if gh is None else (f"{gh:g}", 1 if gh > 20 else 0))
     ls = d["longsor"].upper()
