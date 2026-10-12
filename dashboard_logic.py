@@ -8,6 +8,10 @@ COLS = ["Battery", "MPPT", "HFSM", "Rectifier", "Genset(h)", "Longsor",
 
 VERT_TOLERANSI = 10  # toleransi absolut di atas limit vertikal: hasil <= limit + 10 masih hijau
 
+# Skala warna (rendah 1-25%, sedang 26-50%, tinggi 51-100%) dari persen terhadap INSTALLED
+SKALA_UNMON = (0, 3, 4)    # hijau, kuning, oranye
+SKALA_FAULTY = (3, 4, 1)   # kuning, oranye, merah
+
 
 def nums(s):
     v = re.findall(r"\d+(?:\.\d+)?", s or "")
@@ -32,11 +36,11 @@ def triple(raw):
 def battery_pack(raw):
     """Untuk kolom Battery, MPPT, HFSM, Rectifier.
     Format 'INSTALLED/UNMON/FAULTY', contoh '8/1/1' atau '8/0/0'.
-    Persen unmon dan faulty dihitung dari INSTALLED, lalu dipilih yang terparah.
-    0 = hijau; 3 = kuning; 4 = oranye; 1 = merah.
-    - 1-25%   -> kuning
-    - 26-50%  -> oranye
-    - 51-100% -> merah
+    Persen unmon dan faulty dihitung dari INSTALLED, masing-masing punya skala warna sendiri,
+    lalu warna sel = yang terparah.
+    Kode warna: 0 = hijau; 3 = kuning; 4 = oranye; 1 = merah.
+    - UNMON : 1-25% hijau, 26-50% kuning, 51-100% oranye
+    - FAULTY: 1-25% kuning, 26-50% oranye, 51-100% merah
     - unmon = 0 dan faulty = 0 -> hijau"""
     n = nums(raw)
     if not n or len(n) < 2:
@@ -46,19 +50,19 @@ def battery_pack(raw):
     if inst <= 0 and unmon <= 0 and faulty <= 0:
         return NA
 
-    def level(x):
+    def level(x, skala):
         if x <= 0:
             return 0
-        if inst <= 0:                # ada unmon/faulty tapi installed 0 -> merah
-            return 1
+        if inst <= 0:                # ada unmon/faulty tapi installed 0 -> level tertinggi
+            return skala[2]
         if x * 4 <= inst:            # 1% - 25%
-            return 3
+            return skala[0]
         if x * 2 <= inst:            # 26% - 50%
-            return 4
-        return 1                     # 51% - 100%
+            return skala[1]
+        return skala[2]              # 51% - 100%
 
     urutan = {0: 0, 3: 1, 4: 2, 1: 3}   # hijau < kuning < oranye < merah
-    warna = max(level(unmon), level(faulty), key=lambda s: urutan[s])
+    warna = max(level(unmon, SKALA_UNMON), level(faulty, SKALA_FAULTY), key=lambda s: urutan[s])
     return (txt, warna)
 
 
