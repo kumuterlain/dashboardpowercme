@@ -5,10 +5,11 @@ import gspread
 import streamlit as st
 from google.oauth2.service_account import Credentials
 
-from dashboard_logic import parse, render
+from dashboard_logic import LINK_MAP, attach_links, parse, render
 
 # ====== PENGATURAN ======
-SHEET_ID = "1qMNpvZnB_0TP8tpt8UYkTpRyKQSsjpF529x8FNQbqkw"
+SHEET_ID = "1qMNpvZnB_0TP8tpt8UYkTpRyKQSsjpF529x8FNQbqkw"      # SUMMARY DASHBOARD TOWER
+SRC_ID = "1-mvPESb3Q69Mkvyrle4pVwtFL0SSZ4vWTdkXTVR8sXk"        # MONITORING CME (data asli)
 WORKSHEET = "Power & CME"   # nama tab yang dibaca (harus sama persis dengan nama tab di Google Sheet)
 REFRESH_SECONDS = 60          # interval auto-update
 TIMEZONE = "Asia/Jakarta"
@@ -17,6 +18,8 @@ BG, OK, BAD, NA_BG = "#ffffff", "#16a34a", "#ef4444", "#d1d5db"
 TITLE = "Monitoring Issue Power & CME"
 HIGHLIGHT = "#fde047"  # warna highlight judul
 # ========================
+
+SOURCE_TABS = sorted({c["tab"] for c in LINK_MAP.values()})
 
 st.set_page_config(page_title=TITLE, layout="wide", initial_sidebar_state="collapsed")
 
@@ -45,13 +48,31 @@ a.p:hover{{filter:brightness(.88);box-shadow:0 0 0 .15em rgba(0,0,0,.15)}}
 </style>""", unsafe_allow_html=True)
 
 
-@st.cache_data(ttl=30, show_spinner=False)
-def load_values():
+def client():
     creds = Credentials.from_service_account_info(
         dict(st.secrets["gcp_service_account"]),
         scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"])
-    ws = gspread.authorize(creds).open_by_key(SHEET_ID).worksheet(WORKSHEET)
-    return ws.get_all_values(), ws.id
+    return gspread.authorize(creds)
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def load_values():
+    ws = client().open_by_key(SHEET_ID).worksheet(WORKSHEET)
+    return ws.get_all_values()
+
+
+@st.cache_data(ttl=120, show_spinner=False)
+def load_sources():
+    """Baca tab-tab sumber di MONITORING CME. Tab yang tidak ditemukan dilewati."""
+    sh = client().open_by_key(SRC_ID)
+    out = {}
+    for name in SOURCE_TABS:
+        try:
+            ws = sh.worksheet(name)
+        except gspread.WorksheetNotFound:
+            continue
+        out[name] = {"values": ws.get_all_values(), "gid": ws.id}
+    return out
 
 
 LABELS = {"Semua": "all", "Normal": "ok", "Warning/Critical": "bad"}
@@ -61,10 +82,12 @@ LABELS = {"Semua": "all", "Normal": "ok", "Warning/Critical": "bad"}
 def dashboard():
     err = None
     try:
-        values, gid = load_values()
-        sites = parse(values)
+        sites = parse(load_values())
+        try:
+            attach_links(sites, SRC_ID, load_sources())
+        except Exception as e:  # dashboard tetap tampil, hanya tanpa link
+            st.warning(f"Link ke data asal tidak tersedia: {e}")
         st.session_state["last_sites"] = sites
-        st.session_state["last_url"] = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/edit#gid={gid}"
         st.session_state["last_time"] = datetime.now(ZoneInfo(TIMEZONE))
     except Exception as e:  # tampilkan data terakhir jika ada
         sites, err = st.session_state.get("last_sites"), e
@@ -82,8 +105,7 @@ def dashboard():
         "</div>",
         unsafe_allow_html=True)
     pick = st.session_state.get("flt", "Semua")
-    st.markdown(render(sites, LABELS[pick], base_url=st.session_state.get("last_url")),
-                unsafe_allow_html=True)
+    st.markdown(render(sites, LABELS[pick]), unsafe_allow_html=True)
     t = st.session_state.get("last_time")
     stamp = f"Diperbarui otomatis tiap {REFRESH_SECONDS} detik · terakhir {t:%H:%M:%S}" if t else ""
     st.markdown(
