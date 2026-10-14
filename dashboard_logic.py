@@ -19,14 +19,20 @@ SKALA_FAULTY = (3, 4, 1)   # kuning, oranye, merah
 # 1 = merah. Tambah 4 (oranye), 3 (kuning), atau 0 (hijau) kalau mau ikut bisa diklik.
 LINK_STATUS = (1,)
 
-# Peta bubble -> data asli di spreadsheet MONITORING CME.
-#   tab   : nama tab sumber
-#   key   : header kolom nama site di tab itu
-#   col   : header kolom nilai yang dituju (cocok persis, atau diawali teks ini)
-#   after : (opsional) header jangkar; kolom nilai = kolom tepat setelah jangkar
-# Bubble yang tidak ada di sini (Battery, MPPT, HFSM, Rectifier, Genset, CCTV)
-# belum punya sumber -> tidak jadi link.
+# ID spreadsheet sumber
+SUMMARY_ID = "1qMNpvZnB_0TP8tpt8UYkTpRyKQSsjpF529x8FNQbqkw"   # SUMMARY DASHBOARD TOWER
+GENSET_ID = "12AFD-55qQKX4YuH4WC0HL53h2WymtFRFhHMGwMpbViU"    # 2026 Monitoring Runing Genset harian
+POWER_ID = "1rL9ByQQ2FhKp6upYt9X_atxF0y24oil1jU_BpHCpNgM"     # Konfigurasi Power 2026
+
+# Peta bubble -> data asli di spreadsheet sumber.
+#   sid     : (opsional) ID spreadsheet sumber; kalau tidak ada dipakai SRC_ID (MONITORING CME)
+#   tab     : nama tab (teks) ATAU gid tab (angka, dari ...?gid=XXXX di link)
+#   key     : header kolom nama site di tab itu
+#   col     : header kolom nilai yang dituju (cocok persis, atau diawali teks ini)
+#   after   : (opsional) header jangkar; kolom nilai = kolom tepat setelah jangkar
+#   col_idx : (opsional) nomor kolom 0-based (A=0, B=1, ...) untuk kolom tanpa judul
 LINK_MAP = {
+    # --- spreadsheet MONITORING CME ---
     "longsor": dict(tab="MONITORING CME", key="DESCRIPTION SITE", col="STATUS LONGSOR"),
     "ground": dict(tab="MONITORING GROUNDING", key="DESCRIPTION SITE", col="RESULT"),
     "vert": dict(tab="MONITORING VERTICALITY", key="DESCRIPTION SITE", col="HASIL VERTICALITY"),
@@ -34,6 +40,15 @@ LINK_MAP = {
     "tower": dict(tab="MONITORING CME", key="DESCRIPTION SITE", col="STATUS",
                   after="STATUS INSTALASI"),
     "ac": dict(tab="MONITORING AC", key="SITE NAME", col="STATUS AC"),
+    # --- Konfigurasi Power 2026 (format INSTALLED / UNMON / FAULTY) ---
+    "bat": dict(sid=POWER_ID, tab=755729833, key="SITE NAME", col="KONFIGURASI BATTERY"),
+    "mppt": dict(sid=POWER_ID, tab=755729833, key="SITE NAME", col="KONFIG MPPT"),
+    "hfsm": dict(sid=POWER_ID, tab=755729833, key="SITE NAME", col="KONFIG HFSM"),
+    "rect": dict(sid=POWER_ID, tab=755729833, key="SITE NAME", col="KONFIG RECTIFIER"),
+    # --- Genset: kolom nilai terakhir (tanpa judul) = kolom AF ---
+    "genset": dict(sid=GENSET_ID, tab=1097500244, key="SITE NAME", col_idx=31),
+    # --- CCTV: kolom "x / y" di sebelah CCTV Unmon (tanpa judul) = kolom G ---
+    "cctv": dict(sid=SUMMARY_ID, tab=1478500135, key="SITE NAME", col_idx=6),
 }
 
 
@@ -168,23 +183,30 @@ def parse(values):
     return sites
 
 
+# Alias nama site yang ejaannya beda antar-spreadsheet (kunci & nilai huruf besar)
+ALIAS = {"KOBAKMA": "KOBAGMA", "KOTAMULIA": "KOTA MULIA", "RAISE": "RAISEI"}
+
+
 def _norm(s):
     return " ".join(str(s).upper().split())
 
 
 def _canon(name):
-    """Samakan penulisan nama site antar-sheet (huruf besar, spasi, ejaan Kobagma/Kobakma)."""
-    return _norm(name).replace("KOBAKMA", "KOBAGMA")
+    """Samakan penulisan nama site antar-sheet (huruf besar, spasi, alias ejaan)."""
+    n = _norm(name)
+    return ALIAS.get(n, n)
 
 
-def _locate(values, key_hdr, col_hdr, after=None):
+def _locate(values, key_hdr, col_hdr=None, after=None, col_idx=None):
     """Cari baris header di tab sumber. Return (index kolom nilai, {nama site: nomor baris})."""
     for r, row in enumerate(values):
         h = [_norm(c) for c in row]
         if key_hdr not in h:
             continue
         kc = h.index(key_hdr)
-        if after:
+        if col_idx is not None:
+            cc = col_idx
+        elif after:
             if after not in h:
                 return None
             cc = h.index(after) + 1
@@ -205,24 +227,27 @@ def _locate(values, key_hdr, col_hdr, after=None):
     return None
 
 
-def attach_links(sites, src_id, src):
+def attach_links(sites, default_id, src):
     """Isi s['links'] (URL ke sel di spreadsheet sumber) untuk tiap bubble.
-    src = {nama_tab: {"values": [...], "gid": int}} dari spreadsheet MONITORING CME."""
+    src = {(id_spreadsheet, tab_atau_gid): {"values": [...], "gid": int}}.
+    Entri LINK_MAP boleh punya 'sid'; kalau tidak ada dipakai default_id."""
     located = {}
     for k, cfg in LINK_MAP.items():
-        t = src.get(cfg["tab"])
+        sid = cfg.get("sid", default_id)
+        t = src.get((sid, cfg["tab"]))
         if t:
-            located[k] = (_locate(t["values"], cfg["key"], cfg["col"], cfg.get("after")), t["gid"])
+            located[k] = (_locate(t["values"], cfg["key"], cfg.get("col"),
+                                  cfg.get("after"), cfg.get("col_idx")), t["gid"], sid)
     for s in sites:
         links = []
         for k in CELL_KEYS:
             url = None
             loc = located.get(k)
             if loc and loc[0]:
-                (cc, rows), gid = loc
+                (cc, rows), gid, sid = loc
                 r = rows.get(_canon(s["site"]))
                 if r:
-                    url = (f"https://docs.google.com/spreadsheets/d/{src_id}/edit"
+                    url = (f"https://docs.google.com/spreadsheets/d/{sid}/edit"
                            f"?gid={gid}#gid={gid}&range={col_letter(cc)}{r}")
             links.append(url)
         s["links"] = links
