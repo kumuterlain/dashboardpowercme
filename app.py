@@ -19,7 +19,8 @@ TITLE = "Monitoring Issue Power & CME"
 HIGHLIGHT = "#fde047"  # warna highlight judul
 # ========================
 
-SOURCE_TABS = sorted({c["tab"] for c in LINK_MAP.values()})
+# Semua (spreadsheet, tab/gid) yang perlu dibaca untuk membuat link
+SOURCE_TABS = list({(c.get("sid", SRC_ID), c["tab"]) for c in LINK_MAP.values()})
 
 st.set_page_config(page_title=TITLE, layout="wide", initial_sidebar_state="collapsed")
 
@@ -63,16 +64,24 @@ def load_values():
 
 @st.cache_data(ttl=120, show_spinner=False)
 def load_sources():
-    """Baca tab-tab sumber di MONITORING CME. Tab yang tidak ditemukan dilewati."""
-    sh = client().open_by_key(SRC_ID)
-    out = {}
-    for name in SOURCE_TABS:
+    """Baca semua tab sumber. Return (data, daftar sumber yang gagal dibuka)."""
+    gc = client()
+    out, books, miss = {}, {}, []
+    for sid, ref in SOURCE_TABS:
         try:
-            ws = sh.worksheet(name)
-        except gspread.WorksheetNotFound:
+            if sid not in books:
+                books[sid] = gc.open_by_key(sid)
+            if isinstance(ref, int):          # ref = gid tab
+                ws = next((w for w in books[sid].worksheets() if w.id == ref), None)
+                if ws is None:
+                    raise gspread.WorksheetNotFound(str(ref))
+            else:                             # ref = nama tab
+                ws = books[sid].worksheet(ref)
+        except Exception:
+            miss.append(f"{sid[:8]}… / {ref}")
             continue
-        out[name] = {"values": ws.get_all_values(), "gid": ws.id}
-    return out
+        out[(sid, ref)] = {"values": ws.get_all_values(), "gid": ws.id}
+    return out, miss
 
 
 LABELS = {"Semua": "all", "Normal": "ok", "Warning/Critical": "bad"}
@@ -84,9 +93,13 @@ def dashboard():
     try:
         sites = parse(load_values())
         try:
-            attach_links(sites, SRC_ID, load_sources())
+            src, miss = load_sources()
+            attach_links(sites, SRC_ID, src)
+            if miss:
+                st.warning("Sumber ini belum bisa dibuka (cek share ke service account, "
+                           "atau nama tab/gid): " + "; ".join(miss))
         except Exception as e:  # dashboard tetap tampil, hanya tanpa link
-            st.warning(f"Link ke data asal tidak tersedia: {e}")
+            st.warning(f"Link ke data asal tidak tersedia: {type(e).__name__}: {e}")
         st.session_state["last_sites"] = sites
         st.session_state["last_time"] = datetime.now(ZoneInfo(TIMEZONE))
     except Exception as e:  # tampilkan data terakhir jika ada
